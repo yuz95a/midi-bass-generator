@@ -68,4 +68,4 @@ def main(midi_dir, target_dir, target_dir_no):
     copy_midi_with_bass(midi_dir, target_dir, target_dir_no)
 
 if __name__ == '__main__':
-    main('./XMIDI/jazz', './midi/jazz', './midi/jazz_no_bass')
+    main('./XMIDI/pop', './XMIDIs/pop', './XMIDIs/pop_no_bass')
