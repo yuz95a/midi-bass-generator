@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Project</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            display: flex;
+            width: 80%;
+            height: 80vh;
+        }
+        .left {
+            flex: 3;
+            background-color: #fff;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-right: 20px;
+            position: relative;
+        }
+        .left p {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+        }
+        .right {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .box {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            margin-bottom: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .box:last-child {
+            margin-bottom: 0;
+        }
+        input[type="number"] {
+            width: 80%;
+            padding: 10px;
+            margin-top: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="left" ondrop="dropHandler(event);" ondragover="dragOverHandler(event);">
+            <p>Drag & Drop Files Here</p>
+        </div>
+        <div class="right">
+            <div class="box">
+                Search
+            </div>
+            <div class="box">
+                BPM
+                <input type="number" id="bpm" name="bpm" placeholder="Enter BPM">
+            </div>
+            <div class="box">
+                Bar 마디수
+                <input type="number" id="bar" name="bar" placeholder="Enter Bar Count">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function dragOverHandler(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+        }
+
+        function dropHandler(event) {
+            event.preventDefault();
+            const files = event.dataTransfer.files;
+            if (files.length) {
+                alert(`You dropped ${files.length} file(s).`);
+                // You can handle the files here
+            }
+        }
+    </script>
+</body>
+</html>

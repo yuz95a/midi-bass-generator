@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            display: flex;
+            width: 80%;
+            height: 80vh;
+        }
+        .scrollable {
+            flex: 3;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            overflow-y: scroll;
+            padding: 10px;
+            margin-right: 20px;
+        }
+        .item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .item .number {
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        .play-button {
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        .progress-bar {
+            flex: 1;
+            height: 20px;
+            background-color: #ddd;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+        .progress-text {
+            width: 50px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .progress-text.green {
+            color: green;
+        }
+        .progress-text.orange {
+            color: orange;
+        }
+        .progress-text.red {
+            color: red;
+        }
+        .buttons {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+        button {
+            padding: 10px 20px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: #007BFF;
+            color: white;
+            cursor: pointer;
+            text-align: center;
+        }
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .button-group button {
+            flex: 1;
+            margin: 0 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="scrollable">
+            <div class="item">
+                <div class="number">1</div>
+                <div class="play-button">▶</div>
+                <div class="progress-bar"></div>
+                <div class="progress-text green">18%</div>
+            </div>
+            <div class="item">
+                <div class="number">2</div>
+                <div class="play-button">▶</div>
+                <div class="progress-bar"></div>
+                <div class="progress-text green">22%</div>
+            </div>
+            <div class="item">
+                <div class="number">3</div>
+                <div class="play-button">▶</div>
+                <div class="progress-bar"></div>
+                <div class="progress-text green">25%</div>
+            </div>
+            <div class="item">
+                <div class="number">4</div>
+                <div class="play-button">▶</div>
+                <div class="progress-bar"></div>
+                <div class="progress-text orange">54%</div>
+            </div>
+            <div class="item">
+                <div class="number">5</div>
+                <div class="play-button">▶</div>
+                <div class="progress-bar"></div>
+                <div class="progress-text orange">61%</div>
+            </div>
+            <div class="item">
+                <div class="number">6</div>
+                <div class="play-button">▶</div>
+                <div class="progress-bar"></div>
+                <div class="progress-text red">77%</div>
+            </div>
+            <div class="item">
+                <div class="number">7</div>
+                <div class="play-button">▶</div>
+                <div class="progress-bar"></div>
+                <div class="progress-text red">84%</div>
+            </div>
+            <div class="item">
+                <div class="number">8</div>
+                <div class="play-button">▶</div>
+                <div class="progress-bar"></div>
+                <div class="progress-text red">91%</div>
+            </div>
+        </div>
+        <div class="buttons">
+            <button>Back</button>
+            <div class="button-group">
+                <button>Score</button>
+                <button>TAB</button>
+            </div>
+            <button>Copy</button>
+            <button>RE</button>
+            <button>Save</button>
+        </div>
+    </div>
+</body>
+</html>

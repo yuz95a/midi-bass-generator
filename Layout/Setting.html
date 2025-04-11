@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setting</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            width: 60%;
+        }
+        h1 {
+            text-align: center;
+        }
+        .item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .item input[type="checkbox"] {
+            margin-right: 10px;
+            width: 20px;
+            height: 20px;
+            appearance: none;
+            border: 1px solid #ccc;
+            border-radius: 50%;
+            outline: none;
+            cursor: pointer;
+            position: relative;
+        }
+        .item input[type="checkbox"]:checked::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .item.red input[type="checkbox"]::before {
+            background-color: red;
+        }
+        .item.black input[type="checkbox"]::before {
+            background-color: black;
+        }
+        .sub-options {
+            display: flex;
+            flex-direction: column;
+            margin-left: 30px;
+        }
+        .sub-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        .volume-bar {
+            flex: 1;
+            height: 20px;
+            background-color: #ddd;
+            border-radius: 5px;
+            margin-left: 10px;
+            width: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Connection</h1>
+        <div class="item red">
+            <input type="checkbox" id="daw">
+            <label for="daw">DAW : DAW Name</label>
+        </div>
+        <div class="item red">
+            <input type="checkbox" id="bass">
+            <label for="bass">Choose bass from</label>
+            <div class="sub-options">
+                <div class="sub-item red">
+                    <input type="checkbox" id="basic-bass">
+                    <label for="basic-bass">기본 베이스</label>
+                </div>
+                <div class="sub-item white">
+                    <input type="checkbox" id="daw-virtual">
+                    <label for="daw-virtual">DAW 가상악기</label>
+                </div>
+                <div class="sub-item white">
+                    <input type="checkbox" id="external-input">
+                    <label for="external-input">외부입력</label>
+                </div>
+            </div>
+        </div>
+        <div class="item black">
+            <input type="checkbox" id="speaker">
+            <label for="speaker">Speaker</label>
+            <div class="volume-bar"></div>
+        </div>
+    </div>
+</body>
+</html>

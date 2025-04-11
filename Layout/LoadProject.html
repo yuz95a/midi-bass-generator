@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Load Project</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            display: flex;
+            width: 80%;
+            height: 80vh;
+        }
+        .scrollable {
+            flex: 3;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            overflow-y: scroll;
+            padding: 10px;
+            margin-right: 20px;
+        }
+        .item {
+            padding: 20px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            transition: border 0.3s;
+            cursor: pointer;
+        }
+        .buttons {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+        button {
+            padding: 10px 20px;
+            margin-bottom: 20px;
+            border: none;
+            border-radius: 4px;
+            background-color: #007BFF;
+            color: white;
+            cursor: pointer;
+            text-align: center;
+        }
+        button:last-child {
+            margin-bottom: 0;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="scrollable">
+            <div class="item" onclick="toggleBorder(this)">1. first / 2024.05.01</div>
+            <div class="item" onclick="toggleBorder(this)">2. second / 2024.05.02</div>
+            <div class="item" onclick="toggleBorder(this)">3. third / 2024.05.03</div>
+            <div class="item" onclick="toggleBorder(this)">4. fourth / 2024.05.04</div>
+            <div class="item" onclick="toggleBorder(this)">5. name / date</div>
+            <div class="item" onclick="toggleBorder(this)">6. name / date</div>
+        </div>
+        <div class="buttons">
+            <button onclick="alert('Delete button clicked')">delete</button>
+            <button onclick="alert('Load button clicked')">load</button>
+        </div>
+    </div>
+
+    <script>
+        function toggleBorder(element) {
+            if (element.style.borderWidth === "3px") {
+                element.style.borderWidth = "1px";
+            } else {
+                element.style.borderWidth = "3px";
+            }
+        }
+    </script>
+</body>
+</html>
