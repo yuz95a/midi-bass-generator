@@ -8,3 +8,6 @@
 # MIDI 데이터셋
 XMIDI/
 XMIDIs/
+
+# model
+models/

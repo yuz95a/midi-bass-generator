@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import autocast, GradScaler
 from safetensors.torch import save_file, load_file
 import os
 import math
@@ -14,7 +14,7 @@ def train_model(model, train_loader, optimizer, epochs, device):
     model.train()
 
     # 혼합 정밀도 학습을 위한 scaler 초기화
-    scaler = GradScaler()
+    scaler = GradScaler('cuda')
 
     for epoch in range(epochs):
         total_loss = 0.0
@@ -28,7 +28,7 @@ def train_model(model, train_loader, optimizer, epochs, device):
             optimizer.zero_grad()
             
             # 혼합 정밀도를 위한 autocast 적용
-            with autocast():
+            with autocast('cuda'):
                 # 모델 예측 (Transformer)
                 # bass_track[:, :-1]은 디코더 입력, bass_track[:, 1:]은 예측 타겟
                 pred_bass = model(other_tracks, bass_track[:, :-1])  # [batch_size, seq_len-1, 128]
@@ -127,12 +127,12 @@ if __name__ == "__main__":
         num_workers=4   # 필요에 따라 조정
     )
 
-    # 50M 파라미터 규모의 더 큰 모델 초기화
+    # 50M 파라미터 규모 모델 초기화
     model = transformer.MIDIBassGenerator(
         input_dim=128,      # MIDI 음높이 수
-        hidden_dim=1024,    # 히든 차원
-        num_layers=8,       # 레이어 수
-        nhead=16,           # 어텐션 헤드 수 증
+        hidden_dim=512,     # 히든 차원
+        num_layers=7,       # 레이어 수
+        nhead=8,            # 어텐션 헤드 수
         output_dim=128      # MIDI 음높이 수
     ).to(device)
 

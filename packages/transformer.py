@@ -146,9 +146,9 @@ if __name__ == "__main__":
     # 50M 파라미터 규모 모델 생성 및 파라미터 수 확인
     model_50M = MIDIBassGenerator(
         input_dim=128,
-        hidden_dim=1024,
-        num_layers=8,
-        nhead=16,
+        hidden_dim=512,
+        num_layers=7,
+        nhead=8,
         output_dim=128
     )
     
