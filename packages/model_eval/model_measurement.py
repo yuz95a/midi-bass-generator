@@ -219,9 +219,9 @@ if __name__ == "__main__":
     # 큰 모델 (약 50M 파라미터)
     large_model = transformer.MIDIBassGenerator(
         input_dim=128,
-        hidden_dim=768,
-        num_layers=7,
-        nhead=12,
+        hidden_dim=1024,
+        num_layers=4,
+        nhead=8,
         output_dim=128
     )
     

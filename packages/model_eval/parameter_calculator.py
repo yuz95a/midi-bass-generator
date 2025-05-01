@@ -48,7 +48,7 @@ if __name__ == "__main__":
         # (이름, hidden_dim, num_layers, nhead)
         ("소형 모델 (5.6M)", 256, 3, 8),
         ("중형 모델 (25M)", 512, 6, 8),
-        ("목표 모델 (50M)", 768, 7, 12)
+        ("목표 모델 (50M)", 1024, 4, 8)
     ]
     
     print(f"{'모델 이름':<15} {'Hidden':<8} {'Layers':<8} {'Heads':<8} {'이론적 파라미터':<20} {'실제 파라미터':<20} {'차이':<10}")
@@ -78,9 +78,9 @@ if __name__ == "__main__":
     # 목표 50M 파라미터 모델에 대한 상세 분석
     target_model = MIDIBassGenerator(
         input_dim=input_dim,
-        hidden_dim=768,
-        num_layers=7,
-        nhead=12,
+        hidden_dim=1024,
+        num_layers=3,
+        nhead=16,
         output_dim=output_dim
     )
     

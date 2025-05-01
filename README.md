@@ -4,25 +4,28 @@
 
 ## 데이터셋
 
-이 프로젝트에서 사용된 MIDI 데이터셋은 다음 링크에서 가져왔습니다:
+이 프로젝트에서 사용된 MIDI 데이터셋은 다음 링크에서 가져왔습니다.
 - [XMIDI Dataset](https://github.com/xmusic-project/XMIDI_Dataset?tab=readme-ov-file)
 
 ## 프로젝트 개요
 
-이 프로젝트는 트랜스포머 인코더-디코더 아키텍처를 사용하여 MIDI 파일에서 다른 악기 트랙들을 분석하고, 이에 어울리는 베이스 트랙을 자동으로 생성합니다. 주요 기능은 다음과 같습니다:
+이 프로젝트는 트랜스포머 인코더-디코더 아키텍처를 사용하여 MIDI 파일에서 다른 악기 트랙들을 분석하고, 이에 어울리는 베이스 트랙을 자동으로 생성합니다. 주요 기능은 다음과 같습니다.
 
-- MIDI 파일 로드 및 피아노 롤 변환
-- 베이스 트랙과 다른 트랙 분리
-- 트랜스포머 기반 시퀀스-투-시퀀스 모델 학습
-- 자기회귀(auto-regressive) 방식의 베이스 트랙 생성
-- 생성된 베이스 트랙을 MIDI 파일로 저장
+- MIDI 파일 로드
+- Piano roll 변환
+- 베이스 트랙과 다른 악기 트랙 분리
+- transformer 기반 Seq2Seq 모델 학습
+- 자기회귀 방식으로 베이스 트랙 생성
+- 생성된 bass track을 MIDI 파일로 저장
 
 ## 사용 방법
 
 ### 설치 요구사항
 
 ```bash
-pip install torch pretty_midi safetensors numpy
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
 ### 모델 학습

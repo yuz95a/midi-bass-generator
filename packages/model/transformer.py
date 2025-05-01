@@ -16,30 +16,44 @@ class MIDIBassGenerator(nn.Module):
         
         # 인코더 (다른 트랙들을 처리)
         encoder_layers = nn.TransformerEncoderLayer(
-            d_model=hidden_dim, 
-            nhead=nhead,
-            dim_feedforward=hidden_dim * 4,  # 표준 Transformer 비율
-            dropout=dropout,
-            batch_first=True
+            d_model = hidden_dim, 
+            nhead = nhead,
+            dim_feedforward = hidden_dim * 4,  # 표준 Transformer 비율
+            dropout = dropout,
+            activation = "gelu",
+            batch_first = True,
+            layer_norm_eps =1e-4
         )
         self.encoder = nn.TransformerEncoder(encoder_layers, num_layers=num_layers)
         
         # 디코더 (베이스 트랙 생성)
         decoder_layers = nn.TransformerDecoderLayer(
-            d_model=hidden_dim, 
-            nhead=nhead,
-            dim_feedforward=hidden_dim * 4,  # 표준 Transformer 비율
-            dropout=dropout,
-            batch_first=True
+            d_model = hidden_dim, 
+            nhead = nhead,
+            dim_feedforward = hidden_dim * 4,  # 표준 Transformer 비율
+            dropout = dropout,
+            activation = "gelu",
+            batch_first = True
         )
         self.decoder = nn.TransformerDecoder(decoder_layers, num_layers=num_layers)
         
         # 입출력 프로젝션
-        self.input_projection = nn.Linear(input_dim, hidden_dim)
-        self.output_projection = nn.Linear(hidden_dim, output_dim)
+        self.input_projection = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim)
+        )
+        
+        # 정규화된 출력을 위한 추가 레이어
+        self.output_projection = nn.Sequential(
+            nn.Linear(hidden_dim, output_dim)
+        )
         
         # 위치 인코딩 추가
-        self.pos_encoder = PositionalEncoding(hidden_dim, dropout=dropout, max_len=2000)
+        self.pos_encoder = PositionalEncoding(
+            d_model = hidden_dim,
+            dropout = dropout,
+            max_len = 2000
+        )
 
         # 가중치 초기화
         self._reset_parameters()
@@ -48,37 +62,49 @@ class MIDIBassGenerator(nn.Module):
         """모델 가중치 초기화"""
         for p in self.parameters():
             if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
+                nn.init.kaiming_normal_(p, mode='fan_out', nonlinearity='relu')
+            elif p.dim() == 1:
+                nn.init.constant_(p, 0.)
         
     def forward(self, src, tgt):
-        # src: [batch_size, seq_len, input_dim]
-        # tgt: [batch_size, seq_len, input_dim]
-        
-        # 입력 투영
+        # src: [batch_size, seq_length, input_dim:pitch]
+        # tgt: [batch_size, seq_length, input_dim:pitch]
+        # input_dim -> hidden_dim
         src = self.input_projection(src)
         tgt = self.input_projection(tgt)
+        # src: [batch_size, seq_length, hidden_dim]
+        # tgt: [batch_size, seq_length, hidden_dim]
         
-        # 위치 인코딩 적용
-        src = src.transpose(0, 1)  # [seq_len, batch_size, hidden_dim]
+        # positional encoding
+        src = src.transpose(0, 1)
+        # src: [seq_length, batch_size, hidden_dim]
         src = self.pos_encoder(src)
-        src = src.transpose(0, 1)  # [batch_size, seq_len, hidden_dim]
-        
-        tgt = tgt.transpose(0, 1)  # [seq_len, batch_size, hidden_dim]
+        # src: [seq_length, batch_size, hidden_dim]
+        src = src.transpose(0, 1)
+        # src: [batch_size, seq_length, hidden_dim]
+        tgt = tgt.transpose(0, 1)
+        # tgt: [seq_length, batch_size, hidden_dim]
         tgt = self.pos_encoder(tgt)
-        tgt = tgt.transpose(0, 1)  # [batch_size, seq_len, hidden_dim]
+        # tgt: [seq_length, batch_size, hidden_dim]
+        tgt = tgt.transpose(0, 1)
+        # tgt: [batch_size, seq_length, hidden_dim]
         
         # 인코더 통과
         memory = self.encoder(src)
+        # memory: [batch_size, seq_length, hidden_dim]
         
         # 마스크 생성 (자기회귀 생성을 위한 look-ahead 마스크)
-        tgt_seq_len = tgt.size(1)
+        tgt_seq_len = tgt.size(1) # tgt_seq_len = seq_length
         tgt_mask = generate_square_subsequent_mask(tgt_seq_len).to(tgt.device)
+        # tgt_mask: [seq_length, seq_length]
         
         # 디코더 통과
         output = self.decoder(tgt, memory, tgt_mask=tgt_mask)
+        # output: [batch_size, seq_length, hidden_dim]
         
         # 출력 투영
         output = self.output_projection(output)
+        # output: [batch_size, seq_length, output_dim]
         
         return output
 
@@ -96,11 +122,13 @@ class PositionalEncoding(nn.Module):
         div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(1)  # [max_len, 1, d_model]
+        # pe: [max_len, d_model]
+        pe = pe.unsqueeze(1)
+        # pe: [max_len, 1, d_model]
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        # x 형태: [seq_len, batch_size, d_model]
+        # x: [seq_len, batch_size, d_model]
         x = x + self.pe[:x.size(0), :]
         return self.dropout(x)
 
@@ -139,7 +167,6 @@ def count_model_parameters(model):
     print(f"- 모델 가중치 메모리 (FP16): {fp16_memory:.2f} MB")
     
     return total_params
-
 
 # 테스트 코드
 if __name__ == "__main__":

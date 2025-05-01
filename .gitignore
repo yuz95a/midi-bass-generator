@@ -11,5 +11,11 @@ XMIDIs/
 midi/
 dataset/
 
-# model
+# model 폴더
 models/
+
+#output 폴더
+outputs/
+
+# pkl 폴더
+pkl/

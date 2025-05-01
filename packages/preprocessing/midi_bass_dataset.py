@@ -8,12 +8,12 @@ import glob
 class MIDIBassDataset(Dataset):
     def __init__(self, midi_dir, seq_length=64, beat_resolution=4):
         """
-        MIDI 파일에서 베이스 트랙과 다른 트랙들을 로드하는 데이터셋
+        MIDI 파일에서 베이스 트랙과 다른 악기 트랙을 로드하는 데이터셋
         
         Args:
             midi_dir (str): MIDI 파일이 있는 디렉토리 경로
-            seq_length (int): 시퀀스 길이 (16분음표 기준)
-            beat_resolution (int): 한 박자당 분해능(resolution)
+            seq_length (int): 몇 개의 시간 단위를 한 묶음으로 볼 것인지 나타냄
+            beat_resolution (int): 한 박자를 몇 개의 시간 단위로 나타낼 것인지 나타냄 1은 한 박, 2는 반 박, 4는 1/4박
         """
         self.midi_dir = midi_dir
         self.seq_length = seq_length
@@ -21,11 +21,12 @@ class MIDIBassDataset(Dataset):
         self.midi_files = glob.glob(os.path.join(midi_dir, '**/*.midi'), recursive=True)
         
         # 유효하지 않은 MIDI 파일 필터링
+        # 트랙이 2개 이상인 것만 필터링
         self.valid_files = []
         for file in self.midi_files:
             try:
                 midi_data = pretty_midi.PrettyMIDI(file)
-                if len(midi_data.instruments) > 1:  # 적어도 2개 이상의 트랙 필요
+                if len(midi_data.instruments) > 1:
                     self.valid_files.append(file)
             except Exception as e:
                 print(f"파일 로드 중 오류 발생: {file}, 오류: {e}")
@@ -47,7 +48,7 @@ class MIDIBassDataset(Dataset):
         try:
             midi_data = pretty_midi.PrettyMIDI(midi_path)
             
-            # 베이스 트랙 찾기
+            ## 베이스 트랙 찾기
             bass_track = None
             other_tracks = []
             
@@ -61,55 +62,81 @@ class MIDIBassDataset(Dataset):
                 else:
                     other_tracks.append(instrument)
             
-            # 모든 트랙이 piano roll 형태로 변환
+            ## 모든 트랙을 piano roll로 변환
+            # velocity 값을 가진 piano roll 생성
+            # 베이스 트랙 변환
             bass_pianoroll = bass_track.get_piano_roll(fs=self.beat_resolution)
+            # 이진 piano roll로 변환 (0 또는 1)
             bass_pianoroll = (bass_pianoroll > 0).astype(np.float32)
             
-            # 다른 트랙들 변환 및 합치기
+            # 다른 악기 트랙 변환
             other_pianorolls = []
             for track in other_tracks:
                 piano_roll = track.get_piano_roll(fs=self.beat_resolution)
+                # 이진화 적용
                 piano_roll = (piano_roll > 0).astype(np.float32)
                 other_pianorolls.append(piano_roll)
             
-            # 다른 트랙들 합치기 (OR 연산으로)
+            # 다른 트랙들 합치기 (최대값 사용)
             if other_pianorolls:
                 # 모든 피아노롤을 같은 길이로 맞추기
+                # piano roll[pitch:128, time_steps:any]
                 max_length = max([p.shape[1] for p in other_pianorolls])
                 for i in range(len(other_pianorolls)):
                     if other_pianorolls[i].shape[1] < max_length:
                         padding = np.zeros((128, max_length - other_pianorolls[i].shape[1]), dtype=np.float32)
                         other_pianorolls[i] = np.concatenate([other_pianorolls[i], padding], axis=1)
                 
-                # 모든 트랙 합치기
+                # 모든 트랙 합치기 (최대값 사용)
                 combined_pianoroll = np.zeros_like(other_pianorolls[0])
                 for roll in other_pianorolls:
-                    combined_pianoroll = np.logical_or(combined_pianoroll, roll).astype(np.float32)
+                    combined_pianoroll = np.maximum(combined_pianoroll, roll)
             else:
-                combined_pianoroll = np.zeros((128, self.seq_length), dtype=np.float32)
+                raise Exception("다른 악기 트랙 없음")
             
-            # 길이 맞추기
+            # 베이스 트랙과 다른 음악 트랙 길이를 seq_length로 맞추기
+            # bass_pianoroll[pitch:128, time_steps:seq_length]
+            # combined_pianoroll[0][pitch:128, time_steps:seq_length]
             min_length = min(bass_pianoroll.shape[1], combined_pianoroll.shape[1])
+            # 로드한 트랙이 지정한 시퀀스 길이보다 짧으면 패딩
             if min_length < self.seq_length:
-                # 시퀀스가 너무 짧으면 패딩
                 bass_pad = np.zeros((128, self.seq_length - min_length), dtype=np.float32)
                 other_pad = np.zeros((128, self.seq_length - min_length), dtype=np.float32)
-                
+                # 둘 중 짧은 것에 길이를 맞춰 자른 후 패딩
                 bass_pianoroll = np.concatenate([bass_pianoroll[:, :min_length], bass_pad], axis=1)
                 combined_pianoroll = np.concatenate([combined_pianoroll[:, :min_length], other_pad], axis=1)
             else:
                 # 랜덤 오프셋으로 시퀀스 자르기
                 if min_length > self.seq_length:
-                    offset = np.random.randint(0, min_length - self.seq_length)
-                    bass_pianoroll = bass_pianoroll[:, offset:offset+self.seq_length]
-                    combined_pianoroll = combined_pianoroll[:, offset:offset+self.seq_length]
+                    max_attempts = 100  # 최대 시도 횟수
+                    found_good_sequence = False
+                    
+                    for attempt in range(max_attempts):
+                        offset = np.random.randint(0, min_length - self.seq_length)
+                        temp_bass = bass_pianoroll[:, offset:offset+self.seq_length]
+                        temp_combined = combined_pianoroll[:, offset:offset+self.seq_length]
+                        
+                        # 베이스 piano roll에서 0이 아닌 값의 비율 계산
+                        non_zero_ratio = np.count_nonzero(temp_bass) / (temp_bass.shape[0] * temp_bass.shape[1])
+                        
+                        # 0이 아닌 값이 전체의 50% 이상이면 선택
+                        if non_zero_ratio >= 0.25:
+                            bass_pianoroll = temp_bass
+                            combined_pianoroll = temp_combined
+                            found_good_sequence = True
+                            break
+                    
+                    # 적합한 시퀀스를 찾지 못했다면 마지막 시도한 것 사용
+                    if not found_good_sequence:
+                        bass_pianoroll = temp_bass
+                        combined_pianoroll = temp_combined
                 else:
                     bass_pianoroll = bass_pianoroll[:, :self.seq_length]
                     combined_pianoroll = combined_pianoroll[:, :self.seq_length]
             
-            # 텐서로 변환 (시퀀스 길이, 피치)로 변환
-            bass_tensor = torch.from_numpy(bass_pianoroll.T)  # [seq_len, 128]
-            other_tensor = torch.from_numpy(combined_pianoroll.T)  # [seq_len, 128]
+            # 텐서로 변환 [time_steps:seq_length, pitch:128]
+            bass_tensor = torch.from_numpy(bass_pianoroll.T)
+            other_tensor = torch.from_numpy(combined_pianoroll.T)
             
             return other_tensor, bass_tensor
             
@@ -164,7 +191,14 @@ def create_dataloaders(train_dir='./midi/train',
 
 
 if __name__ == "__main__":
-    train_loader, test_loader = create_dataloaders()
+    train_loader, test_loader = create_dataloaders(
+        train_dir='./midi/train', 
+        test_dir='./midi/test', 
+        batch_size=64, 
+        seq_length=64, 
+        beat_resolution=4,
+        num_workers=16
+    )
     
     # train 샘플 확인
     for other_tracks, bass_tracks in train_loader:
