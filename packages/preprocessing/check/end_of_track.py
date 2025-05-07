@@ -1,7 +1,10 @@
 from mido import MidiFile, MetaMessage
 import os
 
-def check_end_of_track(path):
+'''
+파일 end of track 이벤트 출력
+'''
+def print_end_of_track(path):
     mid = MidiFile(path)
 
     for i, track in enumerate(mid.tracks):
@@ -15,7 +18,9 @@ def check_end_of_track(path):
             print(f"트랙 {i}: ✅ 마지막 이벤트는 end_of_track입니다.")
         else:
             print(f"트랙 {i}: ❌ 마지막 이벤트는 end_of_track이 아닙니다. (type: {last_event.type})")
-
+'''
+디렉토리 내 모든 midi 파일의 end of track 이벤트 출력
+'''
 def check_end_of_track_directory(directory_path):
     for i, filename in enumerate(sorted(os.listdir(directory_path))):
         if not filename.endswith(".midi"):
@@ -25,9 +30,6 @@ def check_end_of_track_directory(directory_path):
             print(f"{filename}을 검사합니다.")
             midi_path = os.path.join(directory_path, filename)
             try:
-                check_end_of_track(midi_path)
+                print_end_of_track(midi_path)
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
-
-if __name__ == "__main__":
-    check_end_of_track_directory(os.path.join('midi', 'scale'))

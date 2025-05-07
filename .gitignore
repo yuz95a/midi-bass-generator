@@ -19,3 +19,12 @@ outputs/
 
 # pkl 폴더
 pkl/
+
+token/
+
+json/
+
+generated/
+
+checkpoints/
+checkpoints_sample/

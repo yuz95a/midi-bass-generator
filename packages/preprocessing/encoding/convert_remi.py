@@ -1,17 +1,7 @@
 import os
 import pickle
-import numpy as np
-import pretty_midi
-from collections import defaultdict
-from typing import List, Dict, Tuple, Optional
-
-
-import os
-import copy
+import statistics
 from mido import MidiFile, MidiTrack, Message, merge_tracks
-from fractions import Fraction
-
-import pickle
 
 def split_midi_by_bars_to_file(midipath, bars=8):
     try:
@@ -480,7 +470,7 @@ remi {[
 '''
 def convert_to_remi_events(grouped_events):
 
-    remi_events = []
+    _remi_events = []
     current_bar = 0
     current_position = 0
     bar_length = 1920
@@ -494,22 +484,30 @@ def convert_to_remi_events(grouped_events):
 
     for time, events in grouped_events:
         position_in_bar = time % bar_length
+        position_index = int((position_in_bar / bar_length) * 16) # position quantize
+        
+        # time이 1920인 것이 있다면 다음 마디의 0과 겹침
+        if time == 1920:
+            break
 
-        if position_in_bar != current_position:
-            current_position = position_in_bar
-            position_index = int((position_in_bar / bar_length) * 16)
-            remi_events.append({'type': 'Position', 'value': position_index})
+        '''
+        time과 이벤트들을 묶어서 remi로 변환
+        duration 이벤트는 time이 아니라 start time과 매핑
+        position 이벤트는 있지만 그 외에는 아무 이벤트도 없는 문제 발생
+        '''
+        grouped_remi = []
+        grouped_remi.append({'type': 'Position', 'value': position_index})
 
         for event in events:
             note_id = (event['channel'], event['note'])
 
             if event['type'] == 'note_on':
                 if event['channel'] == 9:
-                    remi_events.append({'type': 'Drumhit', 'value': True})
+                    grouped_remi.append({'type': 'Drumhit', 'value': True})
                 else:
-                    remi_events.append({'type': 'Pitch', 'value': event['note']})
+                    grouped_remi.append({'type': 'Pitch', 'value': event['note']})
 
-                remi_events.append({'type': 'Velocity', 'value': event['velocity']})
+                grouped_remi.append({'type': 'Velocity', 'value': event['velocity']})
                 active_notes[note_id] = time
 
             elif event['type'] == 'note_off':
@@ -517,15 +515,32 @@ def convert_to_remi_events(grouped_events):
                     start_time = active_notes[note_id]
                     duration_ticks = time - start_time
 
-                    remi_events.append({'type': 'Duration', 'value': duration_ticks})
+                    _remi_events.append((start_time, [{'type': 'Duration', 'value': duration_ticks}]))
                     del active_notes[note_id]
                 # 마디 분할 때문에 마디 내 note_on이 없는 것들 처리
                 else:
-                    remi_events.append({'type': 'Duration', 'value': time})
+                    _remi_events.append((0, [{'type': 'Duration', 'value': time}]))
+        
+        _remi_events.append((time, grouped_remi))
+
     # 마디 분할 때문에 마디 내 note_off가 없는 것들 처리
     if active_notes:
-        for note in active_notes:
-            remi_events.append({'type': 'Duration', 'value': bar_length - active_notes[note_id]})
+        for note_id in active_notes:
+            _remi_events.append((active_notes[note_id], [{'type': 'Duration', 'value': bar_length - active_notes[note_id]}]))
+
+    # 시간 별로 정렬 후 이벤트만 추출
+    _remi_events.sort(key=lambda x: x[0])
+
+    '''
+    Position 이벤트만 있고 Pitch나 Drumhit 이벤트가 없으면 제외
+    '''
+    remi_events = []
+    for events in _remi_events:
+        for remi in events[1]:
+            if remi['type'] == 'Position' and len(events[1]) == 1:
+                continue
+            remi_events.append(remi)
+
     return remi_events
 
 '''
@@ -562,41 +577,142 @@ def convert_to_quantize_remi_events(remi_events):
     
     return quantized_events
 
-def convert_to_token(remi_events):
+def convert_to_structured_remi_events(remi_events):
+    position0 = False
+    play = 0
+    duration = 0
+    structured_events = []
+    for event in remi_events:
+        # Position 0 이전의 이벤트 삭제
+        if event['type'] == 'Position':
+            position0 = True
+        if not position0 and event['type'] != 'Position':
+            continue
+
+        # Pitch or Drumhit 이벤트, Velocity 이벤트, Duration 이벤트 묶기
+        if event['type'] == 'Pitch' or event['type'] == 'Drumhit':
+            play += 1
+            structured_events.append((play, event))
+        elif event['type'] == 'Velocity':
+            structured_events.append((play, event))
+        elif event['type'] == 'Duration':
+            duration += 1
+            structured_events.append((duration, event))
+        else:
+            structured_events.append((play, event))
+        
+    structured_events.sort(key=lambda x: x[0])
+
+    position = 0
+    structured_remi_events = []
+    for event in structured_events:
+        if event[1]['type'] == 'Position':
+            position = event[1]['value']
+        structured_remi_events.append((position, event[1]))
+
+    return structured_remi_events
+
+def convert_to_token(remi_events, eos=False):
     token_map = {
-        'Bar': 0,
-        'Position': list(range(1, 17)),
-        'Pitch': list(range(17, 17+128)),
-        'Duration': list(range(145, 145+9)),
-        'Velocity': list(range(154, 154+32))
+        'PAD': 0, # 패딩용 토큰
+        'Position': list(range(1, 1 + 16)),
+        'Drumhit': 17,
+        'Pitch': list(range(18, 18 + 128)),
+        'Velocity': list(range(146, 146 + 32)),
+        'Duration': list(range(178, 178 + 9)),
+        'MASK': 187, # 마스킹
+        'BOS': 188, # 시작
+        'EOS': 189, # 끝
+        'BAR': 190, # 마디 구분
+        'DUMMY': 191 # vocab size를 8의 배수로 맞추기 위한 더미
     }
 
     tokens = []
+
+    if not remi_events:
+        return tokens
+    
+    tokens.append(token_map['BOS'])
     for event in remi_events:
         if event['type'] == 'Position':
             position_token = token_map['Position'][event['value']]
             tokens.append(position_token)
+        elif event['type'] == 'Drumhit':
+            drum_token = token_map['Drumhit']
+            tokens.append(drum_token)
         elif event['type'] == 'Pitch':
             pitch_token = token_map['Pitch'][event['value']]
             tokens.append(pitch_token)
-        elif event['type'] == 'Duration':
-            duration_token = token_map['Duration'][event['value']]
-            tokens.append(duration_token)
         elif event['type'] == 'Velocity':
             # 0-127 벨로시티를 0-31 범위로 양자화
             velocity_level = min(31, event['value'] // 4)
             velocity_token = token_map['Velocity'][velocity_level]
             tokens.append(velocity_token)
+        elif event['type'] == 'Duration':
+            duration_token = token_map['Duration'][event['value']]
+            tokens.append(duration_token)
     
+    tokens.append(token_map['BAR'])
+
+    if eos:
+        tokens.append(token_map['EOS'])
+
     return tokens
+
+def combine_remi_events(*remi_events):
+    result_events = []
+    if len(remi_events) == 1:
+        result_events = [event[1] for event in remi_events[0]]
+    else:
+        for structured_events in remi_events:
+            for events in structured_events:
+                result_events.append(events)
+        result_events.sort(key=lambda x: x[0])
+        result_events = [event[1] for event in result_events]
+
+    # Pitch 이벤트, Drumhit 이벤트 앞에 Position 이벤트가 누락되는 현상 방지
+    position = 0
+    i = 0
+    while i < len(result_events):
+        if result_events[i]['type'] == 'Position':
+            position = result_events[i]['value']
+        elif result_events[i]['type'] == 'Pitch' or result_events[i]['type'] == 'Drumhit':
+            if result_events[i - 1]['type'] != 'Position':
+                result_events.insert(i, {'type': 'Position', 'value': position})
+                i += 1
+        i += 1
+    return result_events
+
+
+def print_statistics(data, title=None):
+    if not data:
+        print("리스트가 비어 있습니다.")
+        return
+
+    max_val = max(data)
+    min_val = min(data)
+    avg_val = sum(data) / len(data)
+    median_val = statistics.median(data)
+    std_dev = statistics.stdev(data) if len(data) > 1 else 0.0
+
+    if title:
+        print(f"{'-'*40}{title}{'-'*40}")
+    print(f"최댓값: {max_val}")
+    print(f"최솟값: {min_val}")
+    print(f"평균: {avg_val:.2f}")
+    print(f"중앙값: {median_val}")
+    print(f"표준편차: {std_dev:.2f}")
 
 
 if __name__ == '__main__':
 
-    input_dir = os.path.join('midi','test')
-    output_dir = 'pkl'
+    input_dir = os.path.join('midi','samble')
+    output_dir = os.path.join('token','test')
 
-    for file_name in os.listdir(input_dir):
+    feature_len = []
+    label_len = []
+
+    for file_name in os.listdir(input_dir): # 각 파일에 대해서
         if file_name.endswith('.midi'):
             midi_path = os.path.join(input_dir, file_name)
             midi_name = os.path.splitext(file_name)[0] + '.midi'
@@ -604,23 +720,71 @@ if __name__ == '__main__':
 
             midis = split_midi_by_bars(os.path.join(input_dir, file_name))
 
-            for i, midi in enumerate(midis):
+            for i, midi in enumerate(midis): # 각 midi 파일의 8마디에 대해서
                 midi_splited_by_bar = split_midi_by_bar(midi.tracks)
 
-                for ii, tracks in enumerate(midi_splited_by_bar):
+                for ii, tracks in enumerate(midi_splited_by_bar): # 각 마디에 대해서
                     bass_tracks, drum_tracks, other_tracks = extract_tracks(tracks)
                     remove_meta_data(bass_tracks)
                     remove_meta_data(drum_tracks)
                     remove_meta_data(other_tracks)
 
-                    for iii, bass in enumerate(bass_tracks):
+                    bass_events = []
+                    for iii, bass in enumerate(bass_tracks): # 베이스 트랙 한 마디에 대해서
                         path = os.path.join(output_dir, f'{file_name}_bass_{i}_{ii}_{iii}.pkl')
-                        save_midi_messages(bass, path)
-                    for iii, drum in enumerate(drum_tracks):
-                        path = os.path.join(output_dir, f'{file_name}_drum_{i}_{ii}_{iii}.pkl')
-                        save_midi_messages(drum, path)
-                    for iii, other in enumerate(other_tracks):
-                        path = os.path.join(output_dir, f'{file_name}_other_{i}_{ii}_{iii}.pkl')
-                        save_midi_messages(other, path)
 
-    print('done')
+                        events = convert_to_events(bass)
+                        grouped_events = convert_to_grouped_events(events)
+                        remi_events = convert_to_remi_events(grouped_events)
+                        quantized_events = convert_to_quantize_remi_events(remi_events)
+                        structured_events = convert_to_structured_remi_events(quantized_events)
+                        # token = convert_to_token(quantized_events)
+                        bass_events.append(structured_events)
+
+                    drum_events = []
+                    for iii, drum in enumerate(drum_tracks): # 드럼 트랙 한 마디에 대해서
+                        path = os.path.join(output_dir, f'{file_name}_drum_{i}_{ii}_{iii}.pkl')
+
+                        events = convert_to_events(drum)
+                        grouped_events = convert_to_grouped_events(events)
+                        remi_events = convert_to_remi_events(grouped_events)
+                        quantized_events = convert_to_quantize_remi_events(remi_events)
+                        structured_events = convert_to_structured_remi_events(quantized_events)
+                        # token = convert_to_token(quantized_events)
+                        drum_events.append(structured_events)
+
+                    other_events = []
+                    for iii, other in enumerate(other_tracks): # 다른 악기 트랙 한 마디에 대해서
+                        path = os.path.join(output_dir, f'{file_name}_other_{i}_{ii}_{iii}.pkl')
+
+                        events = convert_to_events(other)
+                        grouped_events = convert_to_grouped_events(events)
+                        remi_events = convert_to_remi_events(grouped_events)
+                        quantized_events = convert_to_quantize_remi_events(remi_events)
+                        structured_events = convert_to_structured_remi_events(quantized_events)
+                        # token = convert_to_token(quantized_events)
+                        other_events.append(structured_events)
+                
+
+                feature_events = combine_remi_events(*drum_events, *other_events)
+                feature_tokens = convert_to_token(feature_events)
+
+                label_events = combine_remi_events(*bass_events)
+                label_tokens = convert_to_token(label_events)
+
+                if feature_tokens and label_tokens:
+                    # 트랙의 마지막 부분에 EOS 토큰 삽입
+                    if i == len(midis) - 1 and ii == len(midi_splited_by_bar) - 1:
+                        feature_tokens.append(2) # token_map['EOS'] = 2
+                        label_tokens.append(2) # token_map['EOS'] = 2
+
+                    path = os.path.join(output_dir, f'{file_name}_token_{i}_{ii}.pkl')
+                    data = {'feature': feature_tokens, 'label': label_tokens}
+                    save_midi_messages(data, path)
+                    print(f'{file_name}_token_{i}_{ii}.pkl 저장 완료')
+
+                    feature_len.append(len(feature_tokens))
+                    label_len.append(len(label_tokens))
+              
+    print_statistics(feature_len, "feature")
+    print_statistics(label_len, "label")
